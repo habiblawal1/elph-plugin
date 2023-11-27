@@ -1,8 +1,14 @@
 package elph;
 
+import java.io.File;
+
+import org.eclipse.core.resources.IProject;
+import org.eclipse.core.resources.IProjectDescription;
+import org.eclipse.core.resources.ResourcesPlugin;
+import org.eclipse.core.runtime.CoreException;
+import org.eclipse.core.runtime.Path;
 import org.eclipse.jface.dialogs.MessageDialog;
 import org.eclipse.swt.SWT;
-import org.eclipse.swt.custom.StyleRange;
 import org.eclipse.swt.events.SelectionAdapter;
 import org.eclipse.swt.events.SelectionEvent;
 import org.eclipse.swt.layout.GridData;
@@ -11,6 +17,7 @@ import org.eclipse.swt.widgets.Button;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.DirectoryDialog;
 import org.eclipse.swt.widgets.Label;
+import org.eclipse.swt.widgets.Text;
 import org.eclipse.ui.part.ViewPart;
 
 public class MainScreen extends ViewPart {
@@ -36,7 +43,6 @@ public class MainScreen extends ViewPart {
 	    
 		Button fileBrowser = new Button(parent, SWT.PUSH);
 	    fileBrowser.setText("Edit Directory Location...");
-//	    browse.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false,1,0));
 	    fileBrowser.addSelectionListener(new SelectionAdapter() {
             public void widgetSelected(SelectionEvent e) {
                 DirectoryDialog dialog = new DirectoryDialog(parent.getShell(), SWT.NULL);
@@ -46,18 +52,42 @@ public class MainScreen extends ViewPart {
                 	olLocation.setLayoutData(new GridData(SWT.FILL, SWT.CENTER));
                 }
             }
-
         });
 	    
+	    //Add some blank rows for spacing
+	    for (int i=0; i<3; i++) {
+	    	new Label(parent, SWT.NONE);
+	    }
+	    
+	    Label importLabel = new Label(parent, SWT.WRAP);
+	    importLabel.setText("Please type below the project you would like to import");
+		importLabel.setLayoutData(new GridData(SWT.LEFT, SWT.BOTTOM, true, false, 3, 1));
+	    
+	    Text importTextBox = new Text(parent, SWT.BORDER);
+	    importTextBox.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false,2,1));
+	    
 		Button importBtn = new Button(parent, SWT.PUSH);
-		importBtn.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, false, false,2,1));
 		importBtn.setText("Import Project");
 		importBtn.addSelectionListener(new SelectionAdapter() {
 			@Override
 			public void widgetSelected(SelectionEvent e) {
-				if (validatePath(olLocation.getText())) infoDialogue(parent, "Successfully Imported Projects!");
-				else errorDialogue(parent, "Please choose a valid directory location of your Open Liberty location. "
-						+ "You must choose the 'dev' repository.");
+				if (validatePath(olLocation.getText())) {
+//					/Users/habiblawal/Documents/GitHub/open-liberty/dev/cnf
+//					/Users/habiblawal/Documents/GitHub/open-liberty/dev/build.sharedResources
+//					/Users/habiblawal/Documents/GitHub/open-liberty/dev/com.ibm.ws.jndi.open_fat
+					String projectPath = importTextBox.getText();
+					File file = new File(projectPath);
+					try {
+						if (file.exists() && file.isDirectory()) {
+							importProject(file, file.getName());
+							infoDialogue(parent, "Successfully Imported " + file.getName());
+							importTextBox.setText("");
+						} else throw new RuntimeException("Failed to import project. Please double check the project exists");
+					} catch (RuntimeException | CoreException  err) {
+						errorDialogue(parent, err.getMessage());
+					}
+				} else errorDialogue(parent, "Please choose a valid directory location of your Open Liberty location. "
+					+ "You must choose the 'dev' folder.");
 			}	
 		});
 	}
@@ -89,4 +119,13 @@ public class MainScreen extends ViewPart {
 	}
 	
 	public boolean validatePath(String path) { return path.length() > 3 && path.endsWith("/dev"); }
+	
+	private static void importProject(final File baseDirectory, final String projectName) throws CoreException {
+		IProjectDescription description = ResourcesPlugin.getWorkspace().loadProjectDescription(
+				new Path(baseDirectory.getAbsolutePath() + "/.project"));
+		IProject project = ResourcesPlugin.getWorkspace().getRoot().getProject(description.getName());
+		project.create(description, null);
+		project.open(null);
+	}
+	
 }
